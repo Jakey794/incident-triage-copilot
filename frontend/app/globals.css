@@ -35,8 +35,9 @@
 
 html {
   background:
-    radial-gradient(circle at top, rgba(15, 118, 110, 0.13), transparent 28%),
-    linear-gradient(180deg, #f5f8f7 0%, #edf2f1 45%, #e8efee 100%);
+    radial-gradient(circle at top, rgba(15, 118, 110, 0.12), transparent 28%),
+    linear-gradient(180deg, #f6f8f7 0%, #edf2f1 45%, #e7eeed 100%);
+  color-scheme: light;
 }
 
 body {
@@ -45,6 +46,12 @@ body {
   background: transparent;
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }
 
 ::selection {

@@ -14,6 +14,10 @@ type ResultState =
   | { message: string; status: "error" }
   | { data: AnalyzeIncidentResponse; status: "success" };
 
+type DemoIncident = AnalyzeIncidentRequest & {
+  label: string;
+};
+
 const initialForm: AnalyzeIncidentRequest = {
   incident_packet: "",
   service: "",
@@ -22,25 +26,46 @@ const initialForm: AnalyzeIncidentRequest = {
   metric_summary: "",
 };
 
-const samplePacket = `Summary: Elevated checkout failures started 8 minutes after the 14:05 UTC production deploy.
-Impact: Roughly 22% of checkout requests are returning HTTP 500 and payment completion has dropped sharply.
-Signals: Error rate increased on checkout-api pods in us-east-1. Logs show "missing STRIPE_SIGNING_SECRET" during request handling.
-Mitigation attempts: Rolled one pod manually and invalidated edge cache with no improvement.
-Escalation: Incident commander requests triage on likely cause and first response actions.`;
+const demoIncidents: DemoIncident[] = [
+  {
+    label: "Load demo: deployment failure",
+    incident_packet:
+      "Production alerts fired 8 minutes after a rollout to checkout-api. HTTP 500 rate increased from 0.4% to 19.2%. Checkout requests are failing across web and mobile. Customer support reports users cannot complete purchases. Error logs show a spike in null reference exceptions in the payment routing path. Request volume is steady and rollback has not started yet.",
+    service: "checkout-api",
+    environment: "production",
+    recent_deployment:
+      "Rolled out build 2026.04.09.7 with payment routing and feature-flag cleanup changes",
+    metric_summary:
+      "HTTP 500 rate 0.4% -> 19.2%, p95 latency 420ms -> 1.8s, request volume steady, checkout conversion sharply down",
+  },
+  {
+    label: "Load demo: DB timeout",
+    incident_packet:
+      "User-facing latency alerts triggered for accounts-api in production. p95 latency increased from 280ms to 3.4s over the last 20 minutes, with intermittent 504s from upstream callers. Application logs show repeated database timeout and connection pool exhaustion messages on profile and account summary queries. No fresh deployment to accounts-api was made today. The database team reports elevated load on the primary cluster after an analytics job started.",
+    service: "accounts-api",
+    environment: "production",
+    recent_deployment: "No application deploy in the last 24 hours",
+    metric_summary:
+      "p95 latency 280ms -> 3.4s, timeout rate increasing, DB connection pool saturated, intermittent upstream 504s",
+  },
+  {
+    label: "Load demo: queue backlog",
+    incident_packet:
+      "Background processing alerts fired for notifications-worker. Queue depth has grown from 1.2k to 48k jobs over the last 35 minutes. Worker throughput dropped by roughly 70% after a maintenance restart earlier today. User-triggered emails and push notifications are delayed, but core request traffic is healthy. Logs show repeated retries on a third-party provider call and workers spending longer in retry backoff.",
+    service: "notifications-worker",
+    environment: "production",
+    recent_deployment:
+      "Worker pods restarted during routine node maintenance; no new app release",
+    metric_summary:
+      "Queue depth 1.2k -> 48k, processing throughput down 70%, retry count rising, core API traffic healthy",
+  },
+];
 
 const genericErrorMessage =
   "Unable to analyze incident. Check the backend connection and try again.";
 
 export function IncidentForm() {
-  const [form, setForm] = useState<AnalyzeIncidentRequest>({
-    ...initialForm,
-    incident_packet: samplePacket,
-    service: "checkout-api",
-    environment: "production",
-    recent_deployment: "Version 2026.04.09-rc3 deployed at 14:05 UTC",
-    metric_summary:
-      "Checkout success rate down 22%. checkout-api HTTP 500 rate elevated in us-east-1.",
-  });
+  const [form, setForm] = useState<AnalyzeIncidentRequest>(initialForm);
   const [resultState, setResultState] = useState<ResultState>({
     status: "empty",
   });
@@ -65,6 +90,17 @@ export function IncidentForm() {
     ) {
       setValidationError(null);
     }
+  };
+
+  const loadDemo = (demo: DemoIncident) => {
+    setForm({
+      incident_packet: demo.incident_packet,
+      service: demo.service,
+      environment: demo.environment,
+      recent_deployment: demo.recent_deployment,
+      metric_summary: demo.metric_summary,
+    });
+    setValidationError(null);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -105,12 +141,29 @@ export function IncidentForm() {
       <section className="rounded-[24px] border border-border bg-panel-strong p-5 shadow-[var(--shadow)] sm:p-6">
         <div className="flex flex-col gap-2 border-b border-slate-200 pb-5">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">
-            Incident packet
+            Incident input
           </h2>
           <p className="text-sm leading-6 text-muted">
-            Capture the raw operational context and send it directly to the live
-            triage backend.
+            Capture the incident context and send it to the triage backend.
           </p>
+        </div>
+
+        <div className="mt-5 rounded-[20px] border border-slate-200 bg-slate-50/90 p-4">
+          <p className="text-sm leading-6 text-slate-600">
+            Use a demo packet or enter your own incident details.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {demoIncidents.map((demo) => (
+              <button
+                key={demo.label}
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-200"
+                type="button"
+                onClick={() => loadDemo(demo)}
+              >
+                {demo.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <form className="mt-5 space-y-5" onSubmit={handleSubmit}>
@@ -125,7 +178,7 @@ export function IncidentForm() {
               onChange={(event) =>
                 setField("incident_packet", event.target.value)
               }
-              placeholder="Paste the incident summary, logs, timeline, and responder notes."
+              placeholder="Paste the incident summary, timeline, logs, and responder notes."
             />
             {validationError ? (
               <p className="mt-2 rounded-xl border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger">
@@ -196,8 +249,7 @@ export function IncidentForm() {
 
           <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-6 text-muted">
-              Submit live incident context to generate a structured triage brief
-              from the backend.
+              Submit the incident context to generate a structured triage brief.
             </p>
             <button
               className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:hover:bg-slate-400"

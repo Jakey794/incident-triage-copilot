@@ -63,6 +63,31 @@ SEV_3_SIGNALS = (
 
 RESOURCE_SIGNALS = ("cpu", "memory", "oom", "saturation", "disk", "connection pool")
 DEPENDENCY_SIGNALS = ("database", "db", "postgres", "redis", "cache", "upstream", "third-party")
+DEPLOYMENT_FAILURE_SIGNALS = (
+    "rolled out",
+    "rollout",
+    "rollback has not started",
+    "null reference",
+    "checkout requests are failing",
+    "cannot complete purchases",
+    "feature-flag cleanup",
+)
+DB_TIMEOUT_SIGNALS = (
+    "database timeout",
+    "connection pool exhaustion",
+    "connection pool saturated",
+    "primary cluster",
+    "analytics job",
+    "504",
+)
+QUEUE_BACKLOG_SIGNALS = (
+    "queue depth",
+    "backlog",
+    "throughput dropped",
+    "retry backoff",
+    "notifications are delayed",
+    "push notifications are delayed",
+)
 
 
 def run_triage_pipeline(request: TriageRequest) -> TriageResponse:
@@ -123,6 +148,15 @@ def _assess_severity(combined_text: str, environment: str | None) -> Severity:
         "live",
     }
 
+    if is_production and any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
+        return "sev-1"
+
+    if is_production and any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
+        return "sev-2"
+
+    if any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
+        return "sev-3"
+
     if any(signal in combined_text for signal in SEV_1_SIGNALS):
         return "sev-1"
 
@@ -147,6 +181,24 @@ def _assess_severity(combined_text: str, environment: str | None) -> Severity:
 
 
 def _infer_root_cause(combined_text: str, recent_deployment: str | None) -> str:
+    if any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
+        return (
+            "A recent deployment likely introduced an application regression in the request path, "
+            "with broad production impact after the rollout."
+        )
+
+    if any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
+        return (
+            "Database saturation or timeout pressure on the primary path is the leading hypothesis "
+            "behind the latency increase and intermittent upstream failures."
+        )
+
+    if any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
+        return (
+            "Worker slowdown combined with retry pressure is the leading hypothesis behind the queue "
+            "backlog and delayed asynchronous processing."
+        )
+
     if recent_deployment:
         return (
             "A recent deployment is the leading hypothesis, suggesting a regression or configuration "
@@ -222,7 +274,19 @@ def _recommend_immediate_actions(
             "Check recent changes, config flips, and dependency health to isolate the first bad signal."
         )
 
-    if any(signal in combined_text for signal in DEPENDENCY_SIGNALS):
+    if any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
+        actions.append(
+            "Inspect database load, slow queries, and connection pool pressure, then reduce pressure or fail over if needed."
+        )
+    elif any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
+        actions.append(
+            "Measure queue depth, retry volume, and worker throughput, then add worker capacity or pause the failing provider path."
+        )
+    elif any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
+        actions.append(
+            "Validate the rollout delta in the failing path and execute rollback or flag mitigation if errors track the new build."
+        )
+    elif any(signal in combined_text for signal in DEPENDENCY_SIGNALS):
         actions.append(
             "Inspect dependency saturation and connection health, then scale or fail over if the bottleneck is confirmed."
         )
