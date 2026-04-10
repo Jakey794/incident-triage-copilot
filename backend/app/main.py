@@ -29,7 +29,10 @@ def get_settings() -> Settings:
         openai_model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
         triage_backend=os.getenv("TRIAGE_BACKEND", "heuristic"),
         cors_origins=_parse_cors_origins(
-            os.getenv("BACKEND_CORS_ORIGINS", "http://localhost:3000")
+            os.getenv(
+                "BACKEND_CORS_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000",
+            )
         ),
     )
 
