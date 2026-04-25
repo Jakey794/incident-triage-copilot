@@ -37,5 +37,5 @@ class TriageResponse(BaseModel):
     impacted_service: str = Field(..., min_length=1)
     severity: Severity
     likely_root_cause_hypothesis: str = Field(..., min_length=1)
-    immediate_next_actions: list[str] = Field(..., min_length=3, max_length=5)
+    immediate_next_actions: list[str] = Field(..., min_length=3, max_length=7)
     confidence_score: float = Field(..., ge=0.0, le=1.0)

@@ -90,7 +90,7 @@ def test_gemini_mode_without_api_key_falls_back_to_heuristic(monkeypatch) -> Non
     }
     assert body["impacted_service"] == "payments"
     assert body["severity"] in {"sev-1", "sev-2", "sev-3", "sev-4"}
-    assert 3 <= len(body["immediate_next_actions"]) <= 5
+    assert 3 <= len(body["immediate_next_actions"]) <= 7
 
 
 def test_groq_mode_without_api_key_falls_back_to_heuristic(monkeypatch) -> None:
@@ -119,7 +119,7 @@ def test_groq_mode_without_api_key_falls_back_to_heuristic(monkeypatch) -> None:
         "confidence_score",
     }
     assert body["severity"] in {"sev-1", "sev-2", "sev-3", "sev-4"}
-    assert 3 <= len(body["immediate_next_actions"]) <= 5
+    assert 3 <= len(body["immediate_next_actions"]) <= 7
 
 
 def test_triage_endpoint_rejects_empty_incident_packet() -> None:
