@@ -95,6 +95,84 @@ QUEUE_BACKLOG_SIGNALS = (
     "notifications are delayed",
     "push notifications are delayed",
 )
+WEBHOOK_IDEMPOTENCY_SIGNALS = (
+    "duplicate email",
+    "duplicate order confirmation",
+    "duplicate confirmation",
+    "duplicate event",
+    "repeated event",
+    "idempotency",
+    "idempotency check",
+    "webhook retries",
+    "vendor webhook",
+    "provider retry",
+)
+DISPLAY_CONFIG_SIGNALS = (
+    "display mismatch",
+    "display issue",
+    "pricing display",
+    "billing page display",
+    "cad/usd",
+    "cad",
+    "usd",
+    "locale",
+    "localization",
+    "formatting mismatch",
+    "config sync",
+    "config lookup",
+    "lookup timeout",
+    "presentation",
+    "display-only",
+)
+STALE_CONTENT_SIGNALS = (
+    "stale content",
+    "stale status",
+    "stale maintenance banner",
+    "status page",
+    "status-page",
+    "cdn",
+    "cache invalidation failed",
+    "cache invalidation",
+    "maintenance banner",
+)
+CACHE_SESSION_SIGNALS = (
+    "redis",
+    "session",
+    "cache latency",
+    "cache timeout",
+    "session lookup",
+    "fallback retries",
+    "node replacement",
+)
+THIRD_PARTY_SIGNALS = (
+    "provider timeout",
+    "provider error",
+    "provider retry",
+    "vendor retry",
+    "third-party",
+    "rate limit",
+    "circuit breaker",
+)
+HEALTHY_CORE_SIGNALS = (
+    "checkout healthy",
+    "payment capture healthy",
+    "payment failures normal",
+    "charges captured correctly",
+    "api 5xx normal",
+    "core traffic healthy",
+    "core apis healthy",
+    "all systems operational",
+    "latency normal",
+    "background jobs normal",
+)
+NO_DEPLOY_SIGNALS = (
+    "no application deploy",
+    "no app deploy",
+    "no application deployment",
+    "no fresh deploy",
+    "no code deploy",
+    "no code change",
+)
 
 
 def run_triage_pipeline(
@@ -314,37 +392,155 @@ def _infer_impacted_service(request: TriageRequest, combined_text: str) -> str:
     return "unknown-service"
 
 
+def _has_any(combined_text: str, signals: tuple[str, ...]) -> bool:
+    return any(signal in combined_text for signal in signals)
+
+
+def _has_no_deploy_negation(combined_text: str) -> bool:
+    return _has_any(combined_text, NO_DEPLOY_SIGNALS)
+
+
+def _has_api_5xx_negation(combined_text: str) -> bool:
+    return "api 5xx normal" in combined_text or "5xx normal" in combined_text
+
+
+def _is_critical_checkout_or_payment_failure(combined_text: str) -> bool:
+    checkout_is_healthy = "checkout healthy" in combined_text
+    payment_is_healthy = any(
+        signal in combined_text
+        for signal in (
+            "payment capture healthy",
+            "payment failures normal",
+            "charges captured correctly",
+        )
+    )
+    checkout_failure = any(
+        signal in combined_text
+        for signal in (
+            "checkout cannot complete",
+            "cannot complete purchases",
+            "customers cannot complete purchases",
+            "checkout requests are failing",
+        )
+    )
+    payment_failure = any(
+        signal in combined_text
+        for signal in ("payment capture failing", "payment failures elevated", "charges failing")
+    )
+    return (checkout_failure and not checkout_is_healthy) or (
+        payment_failure and not payment_is_healthy
+    )
+
+
+def _is_application_deployment_issue(combined_text: str, recent_deployment: str | None) -> bool:
+    if _has_no_deploy_negation(combined_text):
+        return False
+
+    deployment_text = (recent_deployment or "").lower()
+    has_deploy_context = bool(deployment_text) or any(
+        signal in combined_text
+        for signal in ("application deploy", "app deploy", "release", "rolled out", "rollout")
+    )
+    return has_deploy_context and _has_any(combined_text, DEPLOYMENT_FAILURE_SIGNALS)
+
+
+def _is_database_issue(combined_text: str) -> bool:
+    if "no db alerts" in combined_text and not _has_any(combined_text, DB_TIMEOUT_SIGNALS):
+        return False
+    return _has_any(combined_text, DB_TIMEOUT_SIGNALS) or any(
+        signal in combined_text
+        for signal in (
+            "db timeout",
+            "slow query",
+            "slow queries",
+            "locks",
+            "reporting job",
+            "connection pool",
+        )
+    )
+
+
+def _is_queue_backlog_issue(combined_text: str) -> bool:
+    return _has_any(combined_text, QUEUE_BACKLOG_SIGNALS) or any(
+        signal in combined_text for signal in ("consumer lag", "worker throughput", "drain rate")
+    )
+
+
+def _is_webhook_idempotency_issue(combined_text: str) -> bool:
+    return _has_any(combined_text, WEBHOOK_IDEMPOTENCY_SIGNALS)
+
+
+def _is_display_config_issue(combined_text: str) -> bool:
+    return _has_any(combined_text, DISPLAY_CONFIG_SIGNALS)
+
+
+def _is_stale_content_issue(combined_text: str) -> bool:
+    return _has_any(combined_text, STALE_CONTENT_SIGNALS)
+
+
+def _is_cache_session_issue(combined_text: str) -> bool:
+    return _has_any(combined_text, CACHE_SESSION_SIGNALS)
+
+
+def _is_third_party_issue(combined_text: str) -> bool:
+    if "no provider alerts" in combined_text and not _has_any(combined_text, THIRD_PARTY_SIGNALS):
+        return False
+    return _has_any(combined_text, THIRD_PARTY_SIGNALS)
+
+
 def _assess_severity(combined_text: str, environment: str | None) -> Severity:
     is_production = environment is not None and environment.lower() in {
         "prod",
         "production",
         "live",
     }
+    core_is_healthy = _has_any(combined_text, HEALTHY_CORE_SIGNALS)
 
-    if is_production and any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
-        return "sev-1"
+    if _is_stale_content_issue(combined_text):
+        return "sev-4"
 
-    if is_production and any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
-        return "sev-2"
-
-    if any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
+    if _is_display_config_issue(combined_text):
         return "sev-3"
 
-    if any(signal in combined_text for signal in SEV_1_SIGNALS):
+    if _is_webhook_idempotency_issue(combined_text):
+        return "sev-3"
+
+    if _is_queue_backlog_issue(combined_text):
+        return "sev-3"
+
+    if _is_critical_checkout_or_payment_failure(combined_text):
         return "sev-1"
 
-    if is_production and re.search(r"\b500\b|\b5xx\b", combined_text):
+    if is_production and _is_application_deployment_issue(combined_text, None):
         return "sev-1"
 
-    if any(signal in combined_text for signal in SEV_2_SIGNALS):
+    if is_production and _is_database_issue(combined_text):
         return "sev-2"
 
-    if is_production and any(
-        signal in combined_text for signal in ("latency", "degraded", "timeout")
+    if _is_cache_session_issue(combined_text) or _is_third_party_issue(combined_text):
+        return "sev-2"
+
+    if not core_is_healthy and any(signal in combined_text for signal in SEV_1_SIGNALS):
+        return "sev-1"
+
+    if (
+        is_production
+        and not _has_api_5xx_negation(combined_text)
+        and re.search(r"\b500\b|\b5xx\b", combined_text)
+    ):
+        return "sev-1"
+
+    if not core_is_healthy and any(signal in combined_text for signal in SEV_2_SIGNALS):
+        return "sev-2"
+
+    if (
+        is_production
+        and not core_is_healthy
+        and any(signal in combined_text for signal in ("latency", "degraded", "timeout"))
     ):
         return "sev-2"
 
-    if any(signal in combined_text for signal in SEV_3_SIGNALS):
+    if any(signal in combined_text for signal in (*SEV_3_SIGNALS, "support ticket")):
         return "sev-3"
 
     if any(signal in combined_text for signal in ("warning", "limited", "small impact", "minor")):
@@ -354,25 +550,62 @@ def _assess_severity(combined_text: str, environment: str | None) -> Severity:
 
 
 def _infer_root_cause(combined_text: str, recent_deployment: str | None) -> str:
-    if any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
+    if _is_webhook_idempotency_issue(combined_text):
+        return (
+            "The strongest hypothesis is a webhook retry or idempotency-path issue rather than a "
+            "checkout or payment failure. Duplicate event IDs, vendor retry behavior, or skipped "
+            "idempotency checks are the evidence to confirm before declaring a cause."
+        )
+
+    if _is_display_config_issue(combined_text):
+        return (
+            "The strongest hypothesis is a config, localization, or display-path issue rather than a "
+            "payment processing failure. Config sync or lookup timeout evidence, display mismatch, and "
+            "healthy checkout/payment signals should guide confirmation."
+        )
+
+    if _is_stale_content_issue(combined_text):
+        return (
+            "The strongest hypothesis is stale CDN or content-cache state, not a production service "
+            "outage. The packet points to stale status-page content or failed cache invalidation while "
+            "core systems remain operational."
+        )
+
+    if _is_database_issue(combined_text):
+        return (
+            "Database saturation or timeout pressure is the leading hypothesis, not a deployment "
+            "regression unless a correlated application rollout is present. DB timeout, connection pool, "
+            "slow query, primary cluster, or reporting job evidence should be used to confirm it."
+        )
+
+    if _is_queue_backlog_issue(combined_text):
+        return (
+            "Worker slowdown, retry pressure, or consumer lag is the leading hypothesis behind the queue "
+            "backlog and delayed asynchronous processing. This does not indicate a front-door outage if "
+            "the packet says core APIs are healthy."
+        )
+
+    if _is_cache_session_issue(combined_text):
+        return (
+            "Cache or session instability is the strongest hypothesis based on cache timeout, Redis, "
+            "session lookup, fallback retry, or node replacement evidence. Confirm cache/session latency "
+            "before escalating to an application regression."
+        )
+
+    if _is_third_party_issue(combined_text):
+        return (
+            "A third-party or provider path is the strongest hypothesis when provider timeout, retry, "
+            "rate-limit, or circuit-breaker signals are present. Confirm provider-specific error rates "
+            "before treating the service itself as fully down."
+        )
+
+    if _is_application_deployment_issue(combined_text, recent_deployment):
         return (
             "A recent deployment likely introduced an application regression in the request path, "
             "with broad production impact after the rollout."
         )
 
-    if any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
-        return (
-            "Database saturation or timeout pressure on the primary path is the leading hypothesis "
-            "behind the latency increase and intermittent upstream failures."
-        )
-
-    if any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
-        return (
-            "Worker slowdown combined with retry pressure is the leading hypothesis behind the queue "
-            "backlog and delayed asynchronous processing."
-        )
-
-    if recent_deployment:
+    if recent_deployment and not _has_no_deploy_negation(combined_text):
         return (
             "A recent deployment is the leading hypothesis, suggesting a regression or configuration "
             "change is destabilizing the service."
@@ -410,10 +643,7 @@ def _infer_root_cause(combined_text: str, recent_deployment: str | None) -> str:
             "elevated failures."
         )
 
-    return (
-        "A localized application or dependency regression is the most likely cause based on the current "
-        "signal set."
-    )
+    return "The current signal set is weak or mixed, so the safest hypothesis is an unknown or multi-factor incident."
 
 
 def _summarize_incident(request: TriageRequest, impacted_service: str, severity: Severity) -> str:
@@ -433,51 +663,87 @@ def _recommend_immediate_actions(
     recent_deployment: str | None,
     combined_text: str,
 ) -> list[str]:
+    if _is_webhook_idempotency_issue(combined_text):
+        return [
+            f"Inspect duplicate order_confirmation event IDs and vendor retry attempts affecting {impacted_service}.",
+            "Verify the idempotency check path is running before email send and restore it if skipped.",
+            "Suppress additional duplicate confirmation emails while the retry behavior is isolated.",
+            "Compare checkout and payment capture metrics to confirm the transactional path remains healthy.",
+            "Prepare a safe replay or dedupe cleanup for affected order confirmation events.",
+        ]
+
+    if _is_display_config_issue(combined_text):
+        return [
+            f"Inspect config sync status and lookup timeout rates for {impacted_service}.",
+            "Validate the affected currency, locale, or pricing display against captured charge records.",
+            "Confirm checkout, payment failures, and API 5xx metrics remain normal before escalating severity.",
+            "Identify affected regions, locales, or cached config versions showing the display mismatch.",
+            "Publish support guidance that charges are correct while the display/config issue is corrected.",
+        ]
+
+    if _is_stale_content_issue(combined_text):
+        return [
+            f"Purge CDN and content-cache entries serving the stale status page or maintenance banner for {impacted_service}.",
+            "Validate the rendered production status page from multiple regions after cache purge.",
+            "Confirm login, checkout, billing, API latency, 5xx, and background jobs remain operational.",
+            "Update support or status messaging to clarify that the banner is stale if users are confused.",
+            "Review the cache invalidation job or content publish event that failed to propagate.",
+        ]
+
+    if _is_database_issue(combined_text):
+        return [
+            f"Inspect database connection pool saturation, wait time, and timeout rates for {impacted_service}.",
+            "Review slow queries, locks, CPU, I/O, and active query load on the primary cluster.",
+            "Pause, throttle, or move the reporting or analytics job if its timing matches the degradation.",
+            "Compare p95 latency and 504 rate by endpoint while database pressure is reduced.",
+            "Coordinate with the database owner on failover, read shedding, or query mitigation if pressure persists.",
+        ]
+
+    if _is_queue_backlog_issue(combined_text):
+        return [
+            f"Measure queue depth, drain rate, and consumer lag for {impacted_service}.",
+            "Compare worker throughput before and after the first backlog signal.",
+            "Inspect retry backoff and provider retry volume to identify the path feeding the backlog.",
+            "Temporarily scale workers or pause the failing producer path until drain rate exceeds enqueue rate.",
+            "Validate that core APIs remain healthy while delayed asynchronous work drains.",
+        ]
+
+    if _is_cache_session_issue(combined_text):
+        return [
+            f"Inspect Redis or session lookup latency and timeout rates for {impacted_service}.",
+            "Correlate cache/session errors with node replacement, fallback retry, or timeout spikes.",
+            "Measure auth or session success rate to determine whether impact is partial or broad.",
+            "Reduce fallback retry pressure or route around unhealthy cache nodes if saturation is confirmed.",
+            "Track cache timeout rate and user-facing success rate through mitigation.",
+        ]
+
+    if _is_third_party_issue(combined_text):
+        return [
+            f"Inspect provider timeout, retry, and error rates for the {impacted_service} path.",
+            "Check provider status and rate-limit headers before attributing the incident to local code.",
+            "Tune circuit breakers or rate limits to protect the service while provider errors persist.",
+            "Enable fallback or degrade non-critical provider-dependent behavior where available.",
+            "Monitor provider recovery metrics and user-facing success rate before closing mitigation.",
+        ]
+
     actions = [
-        f"Confirm current user impact and error scope for {impacted_service} using dashboards and logs.",
+        f"Confirm current user impact and error scope for {impacted_service} using service-specific metrics.",
         "Post a concise incident update with scope, timeline, and current mitigation owner.",
     ]
 
-    if recent_deployment:
+    if _is_application_deployment_issue(combined_text, recent_deployment):
         actions.append(
-            "Review the most recent deployment and prepare a rollback or feature flag disable if risk is confirmed."
+            "Pause or roll back the correlated application deployment if errors track the new release."
         )
+        actions.append("Compare error rate, latency, and stack traces by release version.")
     else:
         actions.append(
-            "Check recent changes, config flips, and dependency health to isolate the first bad signal."
+            "Inspect the strongest packet-specific signals before assuming a deployment rollback is needed."
         )
 
-    if any(signal in combined_text for signal in DB_TIMEOUT_SIGNALS):
-        actions.append(
-            "Inspect database load, slow queries, and connection pool pressure, then reduce pressure or fail over if needed."
-        )
-    elif any(signal in combined_text for signal in QUEUE_BACKLOG_SIGNALS):
-        actions.append(
-            "Measure queue depth, retry volume, and worker throughput, then add worker capacity or pause the failing provider path."
-        )
-    elif any(signal in combined_text for signal in DEPLOYMENT_FAILURE_SIGNALS):
-        actions.append(
-            "Validate the rollout delta in the failing path and execute rollback or flag mitigation if errors track the new build."
-        )
-    elif any(signal in combined_text for signal in DEPENDENCY_SIGNALS):
-        actions.append(
-            "Inspect dependency saturation and connection health, then scale or fail over if the bottleneck is confirmed."
-        )
-    elif any(
-        signal in combined_text for signal in ("worker", "queue", "job", "consumer", "backlog")
-    ):
-        actions.append(
-            "Measure queue depth and worker throughput, then add capacity or clear stuck consumers if backlog is growing."
-        )
-    else:
-        actions.append(
-            "Validate host and pod health, including resource pressure, restarts, and regional skew."
-        )
-
-    if severity in {"sev-1", "sev-2"}:
-        actions.append(
-            "Define a concrete recovery metric and watch it continuously while mitigation changes roll out."
-        )
+    actions.append(
+        "Define a concrete recovery metric and watch it continuously while mitigation changes roll out."
+    )
 
     return actions[:5]
 
