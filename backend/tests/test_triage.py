@@ -93,6 +93,35 @@ def test_gemini_mode_without_api_key_falls_back_to_heuristic(monkeypatch) -> Non
     assert 3 <= len(body["immediate_next_actions"]) <= 5
 
 
+def test_groq_mode_without_api_key_falls_back_to_heuristic(monkeypatch) -> None:
+    monkeypatch.setenv("TRIAGE_BACKEND", "groq")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    response = client.post(
+        "/api/triage",
+        json={
+            "incident_packet": "Push notifications are delayed because queue depth is rising.",
+            "environment": "production",
+            "metric_summary": "Worker throughput dropped and retry backoff is increasing.",
+        },
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert set(body) == {
+        "summary",
+        "impacted_service",
+        "severity",
+        "likely_root_cause_hypothesis",
+        "immediate_next_actions",
+        "confidence_score",
+    }
+    assert body["severity"] in {"sev-1", "sev-2", "sev-3", "sev-4"}
+    assert 3 <= len(body["immediate_next_actions"]) <= 5
+
+
 def test_triage_endpoint_rejects_empty_incident_packet() -> None:
     get_settings.cache_clear()
     response = client.post(

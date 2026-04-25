@@ -16,6 +16,8 @@ class Settings:
     triage_backend: str
     gemini_api_key: str | None
     gemini_model: str
+    groq_api_key: str | None
+    groq_model: str
     cors_origins: list[str]
 
 
@@ -30,6 +32,8 @@ def get_settings() -> Settings:
         triage_backend=os.getenv("TRIAGE_BACKEND", "heuristic"),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+        groq_api_key=os.getenv("GROQ_API_KEY"),
+        groq_model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
         cors_origins=_parse_cors_origins(
             os.getenv(
                 "BACKEND_CORS_ORIGINS",
@@ -70,4 +74,6 @@ def triage(request: TriageRequest) -> TriageResponse:
         triage_backend=current_settings.triage_backend,
         gemini_api_key=current_settings.gemini_api_key,
         gemini_model=current_settings.gemini_model,
+        groq_api_key=current_settings.groq_api_key,
+        groq_model=current_settings.groq_model,
     )

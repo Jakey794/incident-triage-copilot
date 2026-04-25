@@ -6,8 +6,12 @@ import json
 import re
 from typing import Any
 
+import httpx
+
 from app.schemas import Severity, TriageRequest, TriageResponse
 from app.services.prompts import GEMINI_TRIAGE_PROMPT
+
+GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 SERVICE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
@@ -99,6 +103,8 @@ def run_triage_pipeline(
     triage_backend: str = "heuristic",
     gemini_api_key: str | None = None,
     gemini_model: str = "gemini-2.5-flash-lite",
+    groq_api_key: str | None = None,
+    groq_model: str = "llama-3.1-8b-instant",
 ) -> TriageResponse:
     if triage_backend.lower() == "gemini":
         gemini_response = _run_gemini_triage(
@@ -108,6 +114,15 @@ def run_triage_pipeline(
         )
         if gemini_response is not None:
             return gemini_response
+
+    if triage_backend.lower() == "groq":
+        groq_response = _run_groq_triage(
+            request=request,
+            api_key=groq_api_key,
+            model=groq_model,
+        )
+        if groq_response is not None:
+            return groq_response
 
     return _run_heuristic_triage(request)
 
@@ -148,15 +163,87 @@ def _run_gemini_triage(
     model: str,
 ) -> TriageResponse | None:
     if not api_key:
+        _log_provider_failure("Gemini", "missing API key")
         return None
 
     try:
         from google import genai
-        from google.genai import types
-    except ImportError:
+    except ImportError as error:
+        _log_provider_failure("Gemini", str(error))
         return None
 
-    prompt = GEMINI_TRIAGE_PROMPT.format(
+    prompt = _build_provider_prompt(request)
+
+    try:
+        client = genai.Client(api_key=api_key, http_options={"timeout": 15_000})
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config={"temperature": 0.0},
+        )
+        payload = _extract_json_payload(response.text)
+        triage_response = TriageResponse.model_validate(payload)
+        print("Gemini triage provider succeeded", flush=True)
+        return triage_response
+    except Exception as error:
+        _log_provider_failure("Gemini", _format_provider_error(error, api_key))
+        return None
+
+
+def _run_groq_triage(
+    *,
+    request: TriageRequest,
+    api_key: str | None,
+    model: str,
+) -> TriageResponse | None:
+    if not api_key:
+        _log_provider_failure("Groq", "missing API key")
+        return None
+
+    try:
+        response = httpx.post(
+            GROQ_CHAT_COMPLETIONS_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Return only a valid JSON object. Do not use markdown. "
+                            "Do not wrap in code fences."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": _build_provider_prompt(request),
+                    },
+                ],
+                "temperature": 0,
+                "response_format": {"type": "json_object"},
+            },
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        raw_text = _extract_groq_message_content(response.json())
+        try:
+            payload = _extract_json_payload(raw_text)
+        except json.JSONDecodeError:
+            _log_groq_json_parse_failure(raw_text)
+            raise
+        triage_response = TriageResponse.model_validate(payload)
+        print("Groq triage provider succeeded", flush=True)
+        return triage_response
+    except Exception as error:
+        _log_provider_failure("Groq", _format_provider_error(error, api_key))
+        return None
+
+
+def _build_provider_prompt(request: TriageRequest) -> str:
+    return GEMINI_TRIAGE_PROMPT.format(
         incident_packet=request.incident_packet,
         service=request.service or "unspecified",
         environment=request.environment or "unspecified",
@@ -164,33 +251,44 @@ def _run_gemini_triage(
         metric_summary=request.metric_summary or "none provided",
     )
 
-    try:
-        client = genai.Client(
-            api_key=api_key,
-            http_options=types.HttpOptions(timeout=8_000),
-        )
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.0,
-            ),
-        )
-        payload = _extract_json_payload(response.text)
-        return TriageResponse.model_validate(payload)
-    except Exception:
-        return None
-
 
 def _extract_json_payload(raw_text: str | None) -> dict[str, Any]:
     if not raw_text:
-        raise ValueError("Gemini returned an empty response")
+        raise ValueError("provider returned an empty response")
 
     payload = json.loads(raw_text)
     if not isinstance(payload, dict):
-        raise ValueError("Gemini returned non-object JSON")
+        raise ValueError("provider returned non-object JSON")
     return payload
+
+
+def _extract_groq_message_content(response_payload: dict[str, Any]) -> str:
+    choices = response_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("Groq returned empty content")
+
+    first_choice = choices[0]
+    message = first_choice.get("message") if isinstance(first_choice, dict) else None
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Groq returned empty content")
+
+    return content.strip()
+
+
+def _format_provider_error(error: Exception, api_key: str | None) -> str:
+    message = str(error)
+    if api_key:
+        message = message.replace(api_key, "[redacted]")
+    return f"{error.__class__.__name__}: {message}"
+
+
+def _log_groq_json_parse_failure(raw_text: str) -> None:
+    print(f"Groq JSON parse failed; response preview: {raw_text[:300]}", flush=True)
+
+
+def _log_provider_failure(provider: str, error: str) -> None:
+    print(f"{provider} triage provider failed; falling back to heuristic: {error}", flush=True)
 
 
 def _build_signal_text(request: TriageRequest) -> str:
