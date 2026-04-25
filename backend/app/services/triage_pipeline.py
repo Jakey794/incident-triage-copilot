@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
+from typing import Any
 
 from app.schemas import Severity, TriageRequest, TriageResponse
+from app.services.prompts import GEMINI_TRIAGE_PROMPT
 
 
 SERVICE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
@@ -90,7 +93,26 @@ QUEUE_BACKLOG_SIGNALS = (
 )
 
 
-def run_triage_pipeline(request: TriageRequest) -> TriageResponse:
+def run_triage_pipeline(
+    request: TriageRequest,
+    *,
+    triage_backend: str = "heuristic",
+    gemini_api_key: str | None = None,
+    gemini_model: str = "gemini-2.5-flash-lite",
+) -> TriageResponse:
+    if triage_backend.lower() == "gemini":
+        gemini_response = _run_gemini_triage(
+            request=request,
+            api_key=gemini_api_key,
+            model=gemini_model,
+        )
+        if gemini_response is not None:
+            return gemini_response
+
+    return _run_heuristic_triage(request)
+
+
+def _run_heuristic_triage(request: TriageRequest) -> TriageResponse:
     combined_text = _build_signal_text(request)
     impacted_service = _infer_impacted_service(request, combined_text)
     severity = _assess_severity(combined_text, request.environment)
@@ -117,6 +139,58 @@ def run_triage_pipeline(request: TriageRequest) -> TriageResponse:
         immediate_next_actions=immediate_next_actions,
         confidence_score=confidence_score,
     )
+
+
+def _run_gemini_triage(
+    *,
+    request: TriageRequest,
+    api_key: str | None,
+    model: str,
+) -> TriageResponse | None:
+    if not api_key:
+        return None
+
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        return None
+
+    prompt = GEMINI_TRIAGE_PROMPT.format(
+        incident_packet=request.incident_packet,
+        service=request.service or "unspecified",
+        environment=request.environment or "unspecified",
+        recent_deployment=request.recent_deployment or "none provided",
+        metric_summary=request.metric_summary or "none provided",
+    )
+
+    try:
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=8_000),
+        )
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.0,
+            ),
+        )
+        payload = _extract_json_payload(response.text)
+        return TriageResponse.model_validate(payload)
+    except Exception:
+        return None
+
+
+def _extract_json_payload(raw_text: str | None) -> dict[str, Any]:
+    if not raw_text:
+        raise ValueError("Gemini returned an empty response")
+
+    payload = json.loads(raw_text)
+    if not isinstance(payload, dict):
+        raise ValueError("Gemini returned non-object JSON")
+    return payload
 
 
 def _build_signal_text(request: TriageRequest) -> str:

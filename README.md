@@ -6,7 +6,7 @@ Incident Triage Copilot is a Rootly-style internal tool for turning a raw incide
 ## Stack
 - Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS
 - Backend: FastAPI, Uvicorn, Pydantic
-- Triage logic: deterministic heuristic pipeline with an optional OpenAI model setting kept behind the existing backend contract
+- Triage logic: deterministic heuristic mode by default, with optional Gemini-backed mode behind the same backend contract
 
 ## Local setup
 1. Copy `.env.example` to `.env` and set the values below.
@@ -16,9 +16,12 @@ Incident Triage Copilot is a Rootly-style internal tool for turning a raw incide
 
 ## Environment variables
 - `NEXT_PUBLIC_API_BASE_URL`: frontend base URL for the backend API, for example `http://127.0.0.1:8000`
-- `TRIAGE_BACKEND`: triage mode used by the backend, default `heuristic`
-- `OPENAI_MODEL`: model name used when the backend is configured to use an LLM path, default `gpt-5.4`
+- `TRIAGE_BACKEND`: triage mode used by the backend, either `heuristic` or `gemini`, default `heuristic`
+- `GEMINI_API_KEY`: Gemini API key used only when `TRIAGE_BACKEND=gemini`
+- `GEMINI_MODEL`: Gemini model name, default `gemini-2.5-flash-lite`
 - `BACKEND_CORS_ORIGINS`: comma-separated allowed frontend origins, for example `http://localhost:3000,http://127.0.0.1:3000`
+
+When `TRIAGE_BACKEND=gemini`, the backend asks Gemini for the same JSON response contract used by the frontend. If the API key is missing, Gemini is unavailable, or the model response fails validation, the backend falls back to the heuristic pipeline.
 
 ## Run commands
 - Backend: `cd backend && uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`

@@ -13,8 +13,9 @@ from app.services.triage_pipeline import run_triage_pipeline
 
 @dataclass(frozen=True)
 class Settings:
-    openai_model: str
     triage_backend: str
+    gemini_api_key: str | None
+    gemini_model: str
     cors_origins: list[str]
 
 
@@ -26,8 +27,9 @@ def _parse_cors_origins(raw_origins: str) -> list[str]:
 @lru_cache
 def get_settings() -> Settings:
     return Settings(
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-5.4"),
         triage_backend=os.getenv("TRIAGE_BACKEND", "heuristic"),
+        gemini_api_key=os.getenv("GEMINI_API_KEY"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         cors_origins=_parse_cors_origins(
             os.getenv(
                 "BACKEND_CORS_ORIGINS",
@@ -52,13 +54,20 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    current_settings = get_settings()
     return {
         "status": "ok",
         "service": "incident-triage-copilot-backend",
-        "triage_backend": settings.triage_backend,
+        "triage_backend": current_settings.triage_backend,
     }
 
 
 @app.post("/api/triage", response_model=TriageResponse)
 def triage(request: TriageRequest) -> TriageResponse:
-    return run_triage_pipeline(request)
+    current_settings = get_settings()
+    return run_triage_pipeline(
+        request,
+        triage_backend=current_settings.triage_backend,
+        gemini_api_key=current_settings.gemini_api_key,
+        gemini_model=current_settings.gemini_model,
+    )
