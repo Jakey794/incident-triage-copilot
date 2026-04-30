@@ -29,10 +29,3 @@ The goal is not to replace responders. The goal is to compress messy context int
 **AI / Triage:** Heuristic mode, Gemini API, Groq API  
 **Testing:** pytest  
 **Deployment:** Vercel frontend, Google Cloud Run backend
-
-## Demo
-
-Add a screenshot or demo GIF here:
-
-```md
-![Incident Triage Copilot Demo](docs/demo.png)
