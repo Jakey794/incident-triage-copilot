@@ -30,14 +30,6 @@ The goal is not to replace responders. The goal is to compress messy context int
 **Testing:** pytest  
 **Deployment:** Vercel frontend, Google Cloud Run backend
 
-## Demo
-
-Demo screenshot or GIF:
-
-```md
-![Incident Triage Copilot Demo](docs/demo.png)
-```
-
 ## Project Structure
 
 ```text
