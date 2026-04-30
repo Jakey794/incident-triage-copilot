@@ -1,64 +1,38 @@
 # Incident Triage Copilot
 
-## Project purpose
-Incident Triage Copilot is a Rootly-style internal tool for turning a raw incident packet into a fast operational brief. It helps responders identify the impacted service, likely severity, probable root cause, and next actions without changing the backend contract or adding extra product surface area.
+AI-assisted incident triage app for turning messy incident context into structured response guidance.
 
-## Stack
-- Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS
-- Backend: FastAPI, Uvicorn, Pydantic
-- Triage logic: deterministic heuristic mode by default, with optional Gemini- or Groq-backed mode behind the same backend contract
+Incident Triage Copilot takes alerts, logs, metrics, deployment notes, service context, and incident descriptions, then returns a structured triage output: severity, impacted service, likely root-cause hypothesis, immediate next actions, and confidence score.
 
-## Local setup
-1. Copy `.env.example` to `.env` and set the values below.
-2. Start the backend from `backend/`.
-3. Start the frontend from `frontend/`.
-4. Open the app in the browser and load one of the demo incidents or paste your own packet.
+## Why I Built This
 
-## Environment variables
-- `NEXT_PUBLIC_API_BASE_URL`: frontend base URL for the backend API, for example `http://127.0.0.1:8000`
-- `TRIAGE_BACKEND`: triage mode used by the backend, either `heuristic`, `gemini`, or `groq`, default `heuristic`
-- `GEMINI_API_KEY`: Gemini API key used only when `TRIAGE_BACKEND=gemini`
-- `GEMINI_MODEL`: Gemini model name, default `gemini-2.5-flash-lite`
-- `GROQ_API_KEY`: Groq API key used only when `TRIAGE_BACKEND=groq`
-- `GROQ_MODEL`: Groq model name, default `llama-3.1-8b-instant`
-- `BACKEND_CORS_ORIGINS`: comma-separated allowed frontend origins, for example `http://localhost:3000,http://127.0.0.1:3000`
+During incidents, teams need to quickly interpret noisy information and decide what to do first. This project explores how a narrow AI workflow can support the first few minutes of incident response without becoming a generic chatbot.
 
-When `TRIAGE_BACKEND=gemini` or `TRIAGE_BACKEND=groq`, the backend asks the configured LLM for the same JSON response contract used by the frontend. If the API key is missing, the provider is unavailable, or the model response fails validation, the backend falls back to the heuristic pipeline.
+The goal is not to replace responders. The goal is to compress messy context into a clear operational brief that helps teams move faster.
 
-## Run commands
-- Backend: `cd backend && uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
-- Backend tests: `cd backend && pytest`
-- Frontend: `cd frontend && npm run dev`
-- Frontend lint: `cd frontend && npm run lint`
+## Features
 
-## Example input
-```json
-{
-  "incident_packet": "Production checkout requests are timing out and customers are seeing repeated 500 errors.",
-  "service": "payments",
-  "environment": "production",
-  "recent_deployment": "Release 2026.04.09.2 shipped 15 minutes ago.",
-  "metric_summary": "HTTP 500s up 65% and p95 latency is 4x baseline."
-}
-```
+- Structured incident triage from raw incident packets
+- Severity, impacted-service, root-cause, next-action, and confidence outputs
+- Next.js frontend for entering or loading incident context
+- FastAPI backend with a stable typed response contract
+- Deterministic heuristic mode by default
+- Optional Gemini or Groq LLM-backed triage behind the same backend contract
+- Provider fallback behavior when an API key is missing or a model response fails validation
+- Demo incident scenarios for testing the workflow
+- Backend tests for response structure and triage behavior
 
-## Example output
-```json
-{
-  "summary": "The incident appears to affect payments in production, with current triage classifying it as sev-1. Reported signal indicates Production checkout requests are timing out and customers are seeing repeated 500 errors, so the immediate priority is to stabilize the service, narrow user impact, and verify recovery signals.",
-  "impacted_service": "payments",
-  "severity": "sev-1",
-  "likely_root_cause_hypothesis": "A recent deployment is the leading hypothesis, suggesting a regression or configuration change is destabilizing the service.",
-  "immediate_next_actions": [
-    "Confirm current user impact and error scope for payments using dashboards and logs.",
-    "Post a concise incident update with scope, timeline, and current mitigation owner.",
-    "Review the most recent deployment and prepare a rollback or feature flag disable if risk is confirmed.",
-    "Validate host and pod health, including resource pressure, restarts, and regional skew.",
-    "Define a concrete recovery metric and watch it continuously while mitigation changes roll out."
-  ],
-  "confidence_score": 0.9
-}
-```
+## Tech Stack
 
-## Why this is relevant to incident management / AI ops
-This mirrors the first minutes of incident response: compress messy signal into a shared brief, make the likely impact explicit, and hand responders a concrete next-step sequence. That is useful for AI ops because it reduces time spent parsing unstructured context and keeps the workflow focused on triage rather than dashboard hopping.
+**Frontend:** Next.js, React, TypeScript, Tailwind CSS  
+**Backend:** FastAPI, Python, Pydantic, Uvicorn  
+**AI / Triage:** Heuristic mode, Gemini API, Groq API  
+**Testing:** pytest  
+**Deployment:** Vercel frontend, Google Cloud Run backend
+
+## Demo
+
+Add a screenshot or demo GIF here:
+
+```md
+![Incident Triage Copilot Demo](docs/demo.png)
