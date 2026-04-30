@@ -4,7 +4,7 @@ AI-assisted incident triage app for turning messy incident context into structur
 
 Incident Triage Copilot takes alerts, logs, metrics, deployment notes, service context, and incident descriptions, then returns a structured triage output: severity, impacted service, likely root-cause hypothesis, immediate next actions, and confidence score.
 
-## Why I Built This
+## Why I Built This 
 
 During incidents, teams need to quickly interpret noisy information and decide what to do first. This project explores how a narrow AI workflow can support the first few minutes of incident response without becoming a generic chatbot.
 
