@@ -4,7 +4,7 @@ AI-assisted incident triage app for turning messy incident context into structur
 
 Incident Triage Copilot takes alerts, logs, metrics, deployment notes, service context, and incident descriptions, then returns a structured triage output: severity, impacted service, likely root-cause hypothesis, immediate next actions, and confidence score.
 
-**[Open the live demo](https://incident-triage-copilot.vercel.app/)**
+**[Open the live demo](https://incidentcopilottriage.com/)**
 
 > [!IMPORTANT]
 > The hosted app is a public demo. Use sample or sanitized data only. Do not submit secrets, personal data, or confidential incident details.
