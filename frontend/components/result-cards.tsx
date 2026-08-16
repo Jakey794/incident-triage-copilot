@@ -38,7 +38,10 @@ function MetricCard({ children, label, tone = "default" }: MetricCardProps) {
 
 function EmptyState() {
   return (
-    <section className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6">
+    <section
+      aria-live="polite"
+      className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6"
+    >
       <div className="rounded-[22px] border border-dashed border-slate-300 bg-white/70 p-6">
         <div className="h-11 w-11 rounded-2xl bg-slate-100" />
         <h2 className="mt-5 text-lg font-semibold tracking-[-0.02em] text-slate-950">
@@ -55,7 +58,11 @@ function EmptyState() {
 
 function LoadingState() {
   return (
-    <section className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6">
+    <section
+      aria-busy="true"
+      aria-live="polite"
+      className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6"
+    >
       <div className="space-y-4">
         <div className="rounded-[22px] border border-slate-200 bg-white p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -101,7 +108,10 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <section className="rounded-[24px] border border-danger/15 bg-white p-5 shadow-[var(--shadow)] sm:p-6">
+    <section
+      aria-live="assertive"
+      className="rounded-[24px] border border-danger/15 bg-white p-5 shadow-[var(--shadow)] sm:p-6"
+    >
       <div className="rounded-[22px] border border-danger/15 bg-danger-soft p-5">
         <div className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-danger">
           Triage unavailable
@@ -120,7 +130,10 @@ function SuccessState({ data }: { data: AnalyzeIncidentResponse }) {
   const severityLabel = data.severity.toUpperCase();
 
   return (
-    <section className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6">
+    <section
+      aria-live="polite"
+      className="rounded-[24px] border border-border bg-[rgba(248,250,252,0.84)] p-5 shadow-[var(--shadow)] sm:p-6"
+    >
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <MetricCard label="Severity">
@@ -150,7 +163,10 @@ function SuccessState({ data }: { data: AnalyzeIncidentResponse }) {
           <ul className="space-y-2">
             {data.immediate_next_actions.map((action) => (
               <li key={action} className="flex gap-3">
-                <span className="mt-2 h-1.5 w-1.5 rounded-full bg-teal-600/70" />
+                <span
+                  aria-hidden="true"
+                  className="mt-2 h-1.5 w-1.5 rounded-full bg-teal-600/70"
+                />
                 <span className="flex-1">{action}</span>
               </li>
             ))}
@@ -162,7 +178,14 @@ function SuccessState({ data }: { data: AnalyzeIncidentResponse }) {
             <p className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
               {confidencePercent}%
             </p>
-            <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+            <div
+              aria-label="Triage confidence"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={confidencePercent}
+              className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200"
+              role="progressbar"
+            >
               <div
                 className="h-full rounded-full bg-teal-600"
                 style={{ width: `${confidencePercent}%` }}

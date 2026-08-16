@@ -64,6 +64,14 @@ const demoIncidents: DemoIncident[] = [
 const genericErrorMessage =
   "Unable to analyze incident. Check the backend connection and try again.";
 
+const fieldLimits = {
+  incident_packet: 12_000,
+  service: 200,
+  environment: 100,
+  recent_deployment: 1_000,
+  metric_summary: 2_000,
+} as const;
+
 export function IncidentForm() {
   const [form, setForm] = useState<AnalyzeIncidentRequest>(initialForm);
   const [resultState, setResultState] = useState<ResultState>({
@@ -101,6 +109,7 @@ export function IncidentForm() {
       metric_summary: demo.metric_summary,
     });
     setValidationError(null);
+    setResultState({ status: "empty" });
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -172,16 +181,28 @@ export function IncidentForm() {
               Incident packet
             </span>
             <textarea
+              aria-describedby="incident-packet-help incident-packet-error"
+              aria-invalid={Boolean(validationError)}
               className="min-h-56 w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent-soft"
+              id="incident-packet"
+              maxLength={fieldLimits.incident_packet}
               name="incident_packet"
+              required
               value={form.incident_packet}
               onChange={(event) =>
                 setField("incident_packet", event.target.value)
               }
               placeholder="Paste the incident summary, timeline, logs, and responder notes."
             />
+            <p id="incident-packet-help" className="mt-2 text-xs text-muted">
+              Maximum {fieldLimits.incident_packet.toLocaleString()} characters.
+            </p>
             {validationError ? (
-              <p className="mt-2 rounded-xl border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger">
+              <p
+                id="incident-packet-error"
+                className="mt-2 rounded-xl border border-danger/20 bg-danger-soft px-3 py-2 text-sm text-danger"
+                role="alert"
+              >
                 {validationError}
               </p>
             ) : null}
@@ -195,6 +216,7 @@ export function IncidentForm() {
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent-soft"
                 name="service"
+                maxLength={fieldLimits.service}
                 value={form.service ?? ""}
                 onChange={(event) => setField("service", event.target.value)}
                 placeholder="checkout-api"
@@ -208,6 +230,7 @@ export function IncidentForm() {
               <input
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent-soft"
                 name="environment"
+                maxLength={fieldLimits.environment}
                 value={form.environment ?? ""}
                 onChange={(event) =>
                   setField("environment", event.target.value)
@@ -224,6 +247,7 @@ export function IncidentForm() {
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent-soft"
               name="recent_deployment"
+              maxLength={fieldLimits.recent_deployment}
               value={form.recent_deployment ?? ""}
               onChange={(event) =>
                 setField("recent_deployment", event.target.value)
@@ -239,6 +263,7 @@ export function IncidentForm() {
             <input
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent-soft"
               name="metric_summary"
+              maxLength={fieldLimits.metric_summary}
               value={form.metric_summary ?? ""}
               onChange={(event) =>
                 setField("metric_summary", event.target.value)
@@ -252,6 +277,7 @@ export function IncidentForm() {
               Submit the incident context to generate a structured triage brief.
             </p>
             <button
+              aria-live="polite"
               className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-slate-300 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:hover:bg-slate-400"
               type="submit"
               disabled={isSubmitting}

@@ -10,11 +10,11 @@ Severity = Literal["sev-1", "sev-2", "sev-3", "sev-4"]
 class TriageRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    incident_packet: str = Field(..., min_length=1)
-    service: str | None = None
-    environment: str | None = None
-    recent_deployment: str | None = None
-    metric_summary: str | None = None
+    incident_packet: str = Field(..., min_length=1, max_length=12_000)
+    service: str | None = Field(default=None, max_length=200)
+    environment: str | None = Field(default=None, max_length=100)
+    recent_deployment: str | None = Field(default=None, max_length=1_000)
+    metric_summary: str | None = Field(default=None, max_length=2_000)
 
     @field_validator("incident_packet")
     @classmethod

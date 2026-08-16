@@ -4,10 +4,14 @@ AI-assisted incident triage app for turning messy incident context into structur
 
 Incident Triage Copilot takes alerts, logs, metrics, deployment notes, service context, and incident descriptions, then returns a structured triage output: severity, impacted service, likely root-cause hypothesis, immediate next actions, and confidence score.
 
+**[Open the live demo](https://incident-triage-copilot.vercel.app/)**
+
+> [!IMPORTANT]
+> The hosted app is a public demo. Use sample or sanitized data only. Do not submit secrets, personal data, or confidential incident details.
+
 ## Demo
 
 <img width="1292" height="901" alt="Screenshot 2026-05-03 at 6 01 44 PM" src="https://github.com/user-attachments/assets/b6cd1ce6-6592-4554-bd4d-94cd3ad96142" />
-
 
 The app takes incident context such as alerts, logs, metrics, deployment notes, and service information, then returns structured triage output including severity, impacted service, root-cause hypothesis, immediate next actions, and confidence score.
 
@@ -36,6 +40,19 @@ The goal is not to replace responders. The goal is to compress messy context int
 **AI / Triage:** Heuristic mode, Gemini API, Groq API  
 **Testing:** pytest  
 **Deployment:** Vercel frontend, Google Cloud Run backend
+
+## Architecture
+
+```text
+Browser
+  -> Next.js frontend on Vercel
+  -> typed HTTPS request
+  -> FastAPI backend on Google Cloud Run
+  -> heuristic triage or configured LLM provider
+  -> validated TriageResponse
+```
+
+The frontend validates the response contract before rendering it. The backend validates request size and output shape, applies a provider timeout, and falls back to deterministic heuristic triage when the configured model is unavailable or returns invalid output.
 
 ## Project Structure
 
@@ -146,6 +163,20 @@ cd frontend
 npm run lint
 npm run build
 ```
+
+GitHub Actions runs backend tests and lint plus frontend lint and the production build on every push and pull request. Dependabot checks the Python, npm, and GitHub Actions dependencies monthly.
+
+## Public Web Readiness
+
+The deployed frontend includes server-rendered content, canonical metadata, Open Graph and Twitter cards, JSON-LD structured data, a sitemap, crawler rules, `llms.txt`, an application manifest, a custom 404 page, production security headers, and disabled browser source maps.
+
+## Security and Privacy
+
+- Never commit provider keys or deployment environment files.
+- Keep secrets in the deployment platform's encrypted environment-variable store.
+- Treat the public demo as untrusted input and do not paste real incident data.
+- Request fields are length-limited, and provider responses are validated before use.
+- If a secret is ever committed, revoke it immediately; removing it from the latest commit does not invalidate it or erase it from Git history.
 
 ## What I Learned
 
