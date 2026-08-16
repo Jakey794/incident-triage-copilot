@@ -5,6 +5,8 @@
 .env
 .env.*
 !.env.example
+backend/.cloudrun.env
+!backend/.cloudrun.env.example
 
 # Python
 __pycache__/

@@ -1,0 +1,19 @@
+# Incident Triage Copilot
+
+> An open-source incident response demo that turns sanitized alerts, logs, metrics, deployment notes, and service context into a structured triage brief.
+
+Incident Triage Copilot returns severity, impacted service, a root-cause hypothesis, immediate next actions, and a confidence score. It uses a typed Next.js and FastAPI interface, supports deterministic heuristic triage, and can optionally use a configured LLM provider with heuristic fallback.
+
+Important: This is a public demo. Use sample or sanitized data only. Do not submit secrets, personal data, or confidential incident details.
+
+## Links
+
+- [Live application](https://incident-triage-copilot.vercel.app/): Interactive public demo.
+- [Source code](https://github.com/Jakey794/incident-triage-copilot): Architecture, setup, tests, and implementation.
+- [License](https://github.com/Jakey794/incident-triage-copilot/blob/main/LICENSE): MIT License.
+
+## Technology
+
+- Frontend: Next.js, React, TypeScript, Tailwind CSS
+- Backend: FastAPI, Python, Pydantic
+- Deployment: Vercel and Google Cloud Run

@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app, get_settings
 
-
 client = TestClient(app)
 
 
@@ -289,3 +288,12 @@ def test_triage_endpoint_rejects_empty_incident_packet() -> None:
     assert response.status_code == 422
     assert response.headers["content-type"].startswith("application/json")
     assert isinstance(response.json(), dict)
+
+
+def test_triage_endpoint_rejects_oversized_incident_packet() -> None:
+    response = client.post(
+        "/api/triage",
+        json={"incident_packet": "x" * 12_001},
+    )
+
+    assert response.status_code == 422
