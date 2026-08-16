@@ -8,7 +8,7 @@ Important: This is a public demo. Use sample or sanitized data only. Do not subm
 
 ## Links
 
-- [Live application](https://incident-triage-copilot.vercel.app/): Interactive public demo.
+- [Live application](https://incidentcopilottriage.com/): Interactive public demo.
 - [Source code](https://github.com/Jakey794/incident-triage-copilot): Architecture, setup, tests, and implementation.
 - [License](https://github.com/Jakey794/incident-triage-copilot/blob/main/LICENSE): MIT License.
 

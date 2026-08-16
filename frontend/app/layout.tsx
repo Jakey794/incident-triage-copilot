@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const siteUrl = "https://incident-triage-copilot.vercel.app";
+const siteUrl = "https://incidentcopilottriage.com";
 const siteTitle = "Incident Triage Copilot";
 const siteDescription =
   "Turn incident alerts, logs, metrics, and deployment context into a structured operational triage brief.";

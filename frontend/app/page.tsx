@@ -4,7 +4,7 @@ const structuredData = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "Incident Triage Copilot",
-  url: "https://incident-triage-copilot.vercel.app",
+  url: "https://incidentcopilottriage.com",
   description:
     "Turn incident alerts, logs, metrics, and deployment context into a structured operational triage brief.",
   applicationCategory: "DeveloperApplication",
