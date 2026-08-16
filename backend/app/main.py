@@ -1,8 +1,8 @@
 """FastAPI entrypoint for the Incident Triage Copilot backend."""
 
+import os
 from dataclasses import dataclass
 from functools import lru_cache
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
