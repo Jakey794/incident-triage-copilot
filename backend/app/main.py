@@ -33,7 +33,7 @@ def get_settings() -> Settings:
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         groq_api_key=os.getenv("GROQ_API_KEY"),
-        groq_model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
+        groq_model=os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
         cors_origins=_parse_cors_origins(
             os.getenv(
                 "BACKEND_CORS_ORIGINS",

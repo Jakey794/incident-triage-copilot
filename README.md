@@ -102,7 +102,7 @@ TRIAGE_BACKEND=heuristic
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash-lite
 GROQ_API_KEY=
-GROQ_MODEL=llama-3.1-8b-instant
+GROQ_MODEL=openai/gpt-oss-20b
 BACKEND_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 

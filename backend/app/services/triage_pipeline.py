@@ -182,7 +182,7 @@ def run_triage_pipeline(
     gemini_api_key: str | None = None,
     gemini_model: str = "gemini-2.5-flash-lite",
     groq_api_key: str | None = None,
-    groq_model: str = "llama-3.1-8b-instant",
+    groq_model: str = "openai/gpt-oss-20b",
 ) -> TriageResponse:
     if triage_backend.lower() == "gemini":
         gemini_response = _run_gemini_triage(
