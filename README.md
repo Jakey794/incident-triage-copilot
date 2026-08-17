@@ -178,6 +178,9 @@ The deployed frontend includes server-rendered content, canonical metadata, Open
 - Request fields are length-limited, and provider responses are validated before use.
 - If a secret is ever committed, revoke it immediately; removing it from the latest commit does not invalidate it or erase it from Git history.
 
+For reporting instructions, see [SECURITY.md](SECURITY.md). For contribution
+guidance, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## What I Learned
 
 - Narrow AI workflows are easier to evaluate than general chatbot interfaces.
